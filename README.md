@@ -3,7 +3,7 @@
 **Version**: 1.0.0  
 **Author**: F3NN3X / Themely.dev  
 **License**: MIT
-**Repository**: [GitHub](https://github.com/F3NN3X/InfoPanel.BTData) (replace with your repo URL)
+**Repository**: [GitHub](https://github.com/F3NN3X/InfoPanel.BTData)
 
 ## Overview
 
