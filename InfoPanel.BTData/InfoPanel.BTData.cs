@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection; // Added for Assembly
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.Devices.Bluetooth;
@@ -14,11 +15,9 @@ using IniParser.Model;
  * Plugin: InfoPanel.BTData
  * Version: 1.0.0
  * Author: F3NN3X / Themely.dev
- * Description: An optimized InfoPanel plugin to monitor Bluetooth LE device status and battery level.
- * Tracks connection status and battery percentage for a device specified by friendly name in an INI file. 
- * Updates every 5 minutes with event-driven detection, robust retry logic, and proper resource cleanup.
+ * Description: An optimized InfoPanel plugin to monitor Bluetooth LE device status and battery level. Tracks connection status and battery percentage for a device specified by friendly name in an INI file. Updates every 5 minutes with event-driven detection, robust retry logic, and proper resource cleanup. Lists detected Bluetooth LE devices as comments in the INI file for easy reference.
  * Changelog (Recent):
- *   - v1.0.0 (Mar 31, 2025): Initial release with device status and battery level monitoring.
+ *   - v1.0.0 (Mar 31, 2025): Initial release with device status and battery level monitoring, added detected devices list in INI.
  * Note: Full history in CHANGELOG.md. Requires Bluetooth capability in the host application (InfoPanel).
  */
 
@@ -68,13 +67,14 @@ namespace InfoPanel.Extras
             _ = StartMonitoringAsync(_cts.Token); // Kick off the monitoring loop in the background
         }
 
-        // Loads configuration settings from an INI file, creating a default if none exists
+        // Loads configuration settings from an INI file, creates a default if none exists, and appends detected devices
         private void LoadConfig()
         {
             _configFilePath = $"{Assembly.GetExecutingAssembly().ManifestModule.FullyQualifiedName}.ini";
             var parser = new FileIniDataParser();
             IniData config;
 
+            // Load or create the INI file
             if (!File.Exists(_configFilePath))
             {
                 config = new IniData();
@@ -93,6 +93,74 @@ namespace InfoPanel.Extras
             }
 
             Console.WriteLine("Bluetooth Plugin: Target device: '{0}', Refresh interval: {1} minutes", _targetFriendlyName, _refreshIntervalMinutes);
+
+            // Detect Bluetooth LE devices and append to INI file as comments
+            var devices = GetDetectedDevicesAsync().GetAwaiter().GetResult(); // Synchronous call during init
+            if (devices.Any())
+            {
+                var lines = new List<string> { ";Detected Devices" };
+                lines.AddRange(devices.Select(d => $";{d}"));
+                AppendToIniFile(lines);
+            }
+            else
+            {
+                AppendToIniFile(new List<string> { ";Detected Devices", ";No Bluetooth LE devices detected" });
+            }
+        }
+
+        // Detects paired Bluetooth LE devices and returns their friendly names
+        private async Task<List<string>> GetDetectedDevicesAsync()
+        {
+            try
+            {
+                string[] requestedProperties = { "System.Devices.Aep.DeviceAddress", "System.Devices.Aep.IsConnected" };
+                var devices = await DeviceInformation.FindAllAsync(
+                    BluetoothLEDevice.GetDeviceSelector(),
+                    requestedProperties
+                ); // Fixed: Removed incorrect CancellationToken argument
+
+                return devices
+                    .Where(d => !string.IsNullOrEmpty(d.Name))
+                    .Select(d => $"{d.Name} {(d.Properties["System.Devices.Aep.IsConnected"] is bool isConnected && isConnected ? "(Connected)" : "(Disconnected)")}")
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Bluetooth Plugin: Error detecting devices: {0}", ex.ToString());
+                return new List<string>();
+            }
+        }
+
+        // Appends lines to the end of the INI file without overwriting existing content
+        private void AppendToIniFile(List<string> lines)
+        {
+            try
+            {
+                if (File.Exists(_configFilePath))
+                {
+                    // Read existing content, filter out old detected devices section
+                    var existingLines = File.ReadAllLines(_configFilePath)
+                        .Where(line => !line.StartsWith(";Detected Devices") && !line.StartsWith(";" + line.TrimStart(';')))
+                        .ToList();
+
+                    // Add a newline if content exists, then append new lines
+                    if (existingLines.Any())
+                        existingLines.Add("");
+                    existingLines.AddRange(lines);
+
+                    File.WriteAllLines(_configFilePath, existingLines);
+                    Console.WriteLine("Bluetooth Plugin: Updated INI file with detected devices");
+                }
+                else
+                {
+                    File.WriteAllLines(_configFilePath, lines);
+                    Console.WriteLine("Bluetooth Plugin: Created INI file with detected devices");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Bluetooth Plugin: Error appending to INI file: {0}", ex.ToString());
+            }
         }
 
         // Registers the plugin's sensors with InfoPanel's UI container
@@ -185,14 +253,16 @@ namespace InfoPanel.Extras
         // Searches for the target Bluetooth device by its friendly name among paired devices
         private async Task<string?> FindTargetDeviceAsync(CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested)
+                return null; // Early exit if cancelled
+
             try
             {
                 string[] requestedProperties = { "System.Devices.Aep.DeviceAddress", "System.Devices.Aep.IsConnected" };
                 var devices = await DeviceInformation.FindAllAsync(
                     BluetoothLEDevice.GetDeviceSelector(),
-                    requestedProperties,
-                    cancellationToken
-                );
+                    requestedProperties
+                ); // Fixed: Removed incorrect CancellationToken argument
 
                 return devices.FirstOrDefault(d => d.Name.Equals(_targetFriendlyName, StringComparison.OrdinalIgnoreCase))?.Id;
             }
@@ -208,6 +278,9 @@ namespace InfoPanel.Extras
         {
             for (int attempt = 1; attempt <= RetryAttempts; attempt++)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    break; // Exit retry loop if cancelled
+
                 try
                 {
                     Console.WriteLine("Bluetooth Plugin: Starting monitor for device ID: {0} (Attempt {1}/{2})", deviceId, attempt, RetryAttempts);
@@ -236,7 +309,7 @@ namespace InfoPanel.Extras
             BluetoothLEDevice? device = null;
             try
             {
-                device = await BluetoothLEDevice.FromIdAsync(deviceId, cancellationToken);
+                device = await BluetoothLEDevice.FromIdAsync(deviceId); // Fixed: Removed incorrect CancellationToken argument
                 if (device == null)
                 {
                     _status.Value = "Failed to connect";
@@ -257,7 +330,7 @@ namespace InfoPanel.Extras
                 // Query the Battery Service (UUID 0x180F)
                 var gattServices = await device.GetGattServicesForUuidAsync(
                     new Guid("0000180F-0000-1000-8000-00805F9B34FB"),
-                    cancellationToken
+                    BluetoothCacheMode.Uncached // Fixed: Replaced CancellationToken with BluetoothCacheMode
                 );
 
                 if (gattServices.Status == GattCommunicationStatus.Success && gattServices.Services.Count > 0)
@@ -266,13 +339,13 @@ namespace InfoPanel.Extras
                     // Query the Battery Level characteristic (UUID 0x2A19)
                     var characteristics = await batteryService.GetCharacteristicsForUuidAsync(
                         new Guid("00002A19-0000-1000-8000-00805F9B34FB"),
-                        cancellationToken
+                        BluetoothCacheMode.Uncached // Fixed: Replaced CancellationToken with BluetoothCacheMode
                     );
 
                     if (characteristics.Status == GattCommunicationStatus.Success && characteristics.Characteristics.Count > 0)
                     {
                         var characteristic = characteristics.Characteristics[0];
-                        var result = await characteristic.ReadValueAsync(cancellationToken);
+                        var result = await characteristic.ReadValueAsync(); // No cancellation support
                         if (result.Status == GattCommunicationStatus.Success)
                         {
                             var reader = Windows.Storage.Streams.DataReader.FromBuffer(result.Value);
