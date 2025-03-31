@@ -9,38 +9,67 @@ using Windows.Devices.Enumeration;
 using InfoPanel.Plugins;
 using IniParser;
 using IniParser.Model;
-using System.Reflection;
 
-namespace InfoPanel.BTData
+/*
+ * Plugin: InfoPanel.BTData
+ * Version: 1.0.0
+ * Author: F3NN3X / Themely.dev
+ * Description: An optimized InfoPanel plugin to monitor Bluetooth LE device status and battery level.
+ * Tracks connection status and battery percentage for a device specified by friendly name in an INI file. 
+ * Updates every 5 minutes with event-driven detection, robust retry logic, and proper resource cleanup.
+ * Changelog (Recent):
+ *   - v1.0.0 (Mar 31, 2025): Initial release with device status and battery level monitoring.
+ * Note: Full history in CHANGELOG.md. Requires Bluetooth capability in the host application (InfoPanel).
+ */
+
+namespace InfoPanel.Extras
 {
-    public class BluetoothBatteryPlugin : BasePlugin
+    public class BluetoothBatteryPlugin : BasePlugin, IDisposable
     {
-        // Plugin data fields
+        // Sensors displayed in the InfoPanel UI
         private readonly PluginText _deviceName = new("device_name", "Device Name", "-");
         private readonly PluginText _status = new("status", "Status", "Disconnected");
         private readonly PluginSensor _batteryLevel = new("battery_level", "Battery Level", 0, "%");
 
-        // Configuration
-        private string? _targetFriendlyName; // Friendly name of the target Bluetooth device
-        private string? _configFilePath;
-        private int _refreshIntervalMinutes = 5; // Default refresh interval (5 minutes)
-        private DateTime _lastUpdateTime = DateTime.MinValue;
+        // Configuration settings and plugin state
+        private string? _targetFriendlyName; // Friendly name of the target Bluetooth device from INI
+        private string? _configFilePath; // Path to the INI configuration file
+        private int _refreshIntervalMinutes = 5; // Default refresh interval in minutes
+        private DateTime _lastUpdate = DateTime.MinValue; // Timestamp of the last UI update
+        private CancellationTokenSource? _cts; // Manages cancellation for async tasks
+        private volatile bool _isMonitoring; // Indicates if the plugin is actively monitoring a device
+        private volatile string? _currentDeviceId; // ID of the currently monitored device
 
-        // Constructor
+        // Constants for retry logic and timing
+        private const int RetryAttempts = 3; // Number of retries for Bluetooth operations
+        private const int RetryDelayMs = 1000; // Delay between retries in milliseconds
+
+        // Constructor initializing plugin metadata
         public BluetoothBatteryPlugin()
             : base(
                 "bluetooth-battery-plugin",
                 "Bluetooth Device Battery",
-                "Displays connection status and battery level of a Bluetooth LE device selected by friendly name."
+                "Monitors Bluetooth LE device status and battery level - v1.0.0"
             )
         {
         }
 
+        // Property exposing the INI file path to InfoPanel
         public override string? ConfigFilePath => _configFilePath;
+
+        // Property defining the update interval for InfoPanel
         public override TimeSpan UpdateInterval => TimeSpan.FromMinutes(_refreshIntervalMinutes);
 
-        // Initialize: Set up config file and read settings
+        // Initializes the plugin by loading config and starting background monitoring
         public override void Initialize()
+        {
+            _cts = new CancellationTokenSource();
+            LoadConfig();
+            _ = StartMonitoringAsync(_cts.Token); // Kick off the monitoring loop in the background
+        }
+
+        // Loads configuration settings from an INI file, creating a default if none exists
+        private void LoadConfig()
         {
             _configFilePath = $"{Assembly.GetExecutingAssembly().ManifestModule.FullyQualifiedName}.ini";
             var parser = new FileIniDataParser();
@@ -48,9 +77,8 @@ namespace InfoPanel.BTData
 
             if (!File.Exists(_configFilePath))
             {
-                // Create default config
                 config = new IniData();
-                config["Bluetooth Battery Plugin"]["FriendlyName"] = ""; // Empty by default, user must set
+                config["Bluetooth Battery Plugin"]["FriendlyName"] = "";
                 config["Bluetooth Battery Plugin"]["RefreshIntervalMinutes"] = "5";
                 parser.WriteFile(_configFilePath, config);
                 _targetFriendlyName = "";
@@ -58,18 +86,16 @@ namespace InfoPanel.BTData
             }
             else
             {
-                // Read existing config
                 config = parser.ReadFile(_configFilePath);
                 _targetFriendlyName = config["Bluetooth Battery Plugin"]["FriendlyName"] ?? "";
                 if (!int.TryParse(config["Bluetooth Battery Plugin"]["RefreshIntervalMinutes"], out _refreshIntervalMinutes) || _refreshIntervalMinutes <= 0)
-                    _refreshIntervalMinutes = 5; // Fallback to 5 minutes
+                    _refreshIntervalMinutes = 5;
             }
 
-            Console.WriteLine($"Bluetooth Plugin: Target device friendly name: '{_targetFriendlyName}'");
-            Console.WriteLine($"Bluetooth Plugin: Refresh interval: {_refreshIntervalMinutes} minutes");
+            Console.WriteLine("Bluetooth Plugin: Target device: '{0}', Refresh interval: {1} minutes", _targetFriendlyName, _refreshIntervalMinutes);
         }
 
-        // Load: Populate the plugin container
+        // Registers the plugin's sensors with InfoPanel's UI container
         public override void Load(List<IPluginContainer> containers)
         {
             var container = new PluginContainer("Bluetooth Device");
@@ -77,142 +103,243 @@ namespace InfoPanel.BTData
             containers.Add(container);
         }
 
-        // UpdateAsync: Fetch Bluetooth device status and battery level
+        // Updates the UI sensors periodically, respecting the refresh interval
         public override async Task UpdateAsync(CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                Console.WriteLine("Bluetooth Plugin: UpdateAsync cancelled.");
-                return;
-            }
+            if (_cts?.IsCancellationRequested != false)
+                return; // Skip if cancelled
 
-            var now = DateTime.UtcNow;
-            if (_lastUpdateTime != DateTime.MinValue && (now - _lastUpdateTime) < TimeSpan.FromMinutes(_refreshIntervalMinutes))
-                return; // Skip if not time to update yet
-
-            Console.WriteLine($"Bluetooth Plugin: Updating at {now:yyyy-MM-dd HH:mm:ss}");
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastUpdate).TotalMinutes < _refreshIntervalMinutes)
+                return; // Throttle updates to avoid unnecessary work
 
             if (string.IsNullOrEmpty(_targetFriendlyName))
             {
+                ResetSensors();
                 _status.Value = "No device specified";
-                _deviceName.Value = "-";
-                _batteryLevel.Value = 0;
-                Console.WriteLine("Bluetooth Plugin: No friendly name set in config.");
-                return;
+                Console.WriteLine("Bluetooth Plugin: No target device specified in config");
+            }
+            else if (_currentDeviceId != null && _isMonitoring)
+            {
+                await UpdateDeviceDataAsync(_currentDeviceId, cancellationToken);
             }
 
+            _lastUpdate = now;
+            Console.WriteLine(
+                "Bluetooth Plugin Update - Device: {0}, Status: {1}, Battery: {2}%",
+                _deviceName.Value,
+                _status.Value,
+                _batteryLevel.Value
+            );
+            await Task.CompletedTask;
+        }
+
+        // Runs a continuous background loop to monitor device presence
+        private async Task StartMonitoringAsync(CancellationToken cancellationToken)
+        {
             try
             {
-                // Enumerate paired Bluetooth LE devices
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (string.IsNullOrEmpty(_targetFriendlyName))
+                    {
+                        ResetSensors();
+                        _status.Value = "No device specified";
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                        continue;
+                    }
+
+                    string? deviceId = await FindTargetDeviceAsync(cancellationToken);
+                    if (deviceId == null && _currentDeviceId != null)
+                    {
+                        // Device is no longer available
+                        ResetSensors();
+                        _cts?.Cancel();
+                        _cts = new CancellationTokenSource();
+                        _currentDeviceId = null;
+                        _isMonitoring = false;
+                        Console.WriteLine("Bluetooth Plugin: Target device '{0}' not found; monitoring stopped", _targetFriendlyName);
+                    }
+                    else if (deviceId != null && !_isMonitoring)
+                    {
+                        // New device detected, start monitoring
+                        ResetSensors();
+                        _cts?.Cancel();
+                        _cts = new CancellationTokenSource();
+                        _currentDeviceId = deviceId;
+                        _deviceName.Value = _targetFriendlyName;
+                        Console.WriteLine("Bluetooth Plugin: Starting monitoring for device '{0}' (ID: {1})", _targetFriendlyName, deviceId);
+                        await MonitorDeviceWithRetryAsync(deviceId, _cts.Token);
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken); // Check every 5 seconds
+                }
+            }
+            catch (TaskCanceledException) { } // Normal on cancellation
+            catch (Exception ex)
+            {
+                Console.WriteLine("Bluetooth Plugin: Monitoring loop error: {0}", ex.ToString());
+            }
+        }
+
+        // Searches for the target Bluetooth device by its friendly name among paired devices
+        private async Task<string?> FindTargetDeviceAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
                 string[] requestedProperties = { "System.Devices.Aep.DeviceAddress", "System.Devices.Aep.IsConnected" };
                 var devices = await DeviceInformation.FindAllAsync(
                     BluetoothLEDevice.GetDeviceSelector(),
-                    requestedProperties
+                    requestedProperties,
+                    cancellationToken
                 );
 
-                DeviceInformation? targetDevice = null;
-                foreach (var device in devices)
-                {
-                    if (device.Name.Equals(_targetFriendlyName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetDevice = device;
-                        break;
-                    }
-                }
+                return devices.FirstOrDefault(d => d.Name.Equals(_targetFriendlyName, StringComparison.OrdinalIgnoreCase))?.Id;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Bluetooth Plugin: Error finding device '{0}': {1}", _targetFriendlyName, ex.ToString());
+                return null;
+            }
+        }
 
-                if (targetDevice == null)
+        // Attempts to monitor the device with retry logic in case of transient failures
+        private async Task MonitorDeviceWithRetryAsync(string deviceId, CancellationToken cancellationToken)
+        {
+            for (int attempt = 1; attempt <= RetryAttempts; attempt++)
+            {
+                try
                 {
-                    _status.Value = "Device not found";
-                    _deviceName.Value = _targetFriendlyName;
+                    Console.WriteLine("Bluetooth Plugin: Starting monitor for device ID: {0} (Attempt {1}/{2})", deviceId, attempt, RetryAttempts);
+                    _isMonitoring = true;
+                    await UpdateDeviceDataAsync(deviceId, cancellationToken);
+                    break; // Exit loop on success
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Bluetooth Plugin: Monitor failed (attempt {0}/{1}): {2}", attempt, RetryAttempts, ex.ToString());
+                    _isMonitoring = false;
+                    if (attempt < RetryAttempts)
+                        await Task.Delay(RetryDelayMs, cancellationToken); // Wait before retrying
+                    else
+                        ResetSensors(); // All attempts failed, reset sensors
+                }
+            }
+        }
+
+        // Updates the device's connection status and battery level
+        private async Task UpdateDeviceDataAsync(string deviceId, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return; // Skip if cancelled
+
+            BluetoothLEDevice? device = null;
+            try
+            {
+                device = await BluetoothLEDevice.FromIdAsync(deviceId, cancellationToken);
+                if (device == null)
+                {
+                    _status.Value = "Failed to connect";
                     _batteryLevel.Value = 0;
-                    Console.WriteLine($"Bluetooth Plugin: Device '{_targetFriendlyName}' not found among paired devices.");
+                    Console.WriteLine("Bluetooth Plugin: Failed to connect to device '{0}'", _targetFriendlyName);
                     return;
                 }
 
-                _deviceName.Value = targetDevice.Name;
-                _status.Value = targetDevice.Properties["System.Devices.Aep.IsConnected"] as bool? == true ? "Connected" : "Disconnected";
+                _status.Value = device.ConnectionStatus == BluetoothConnectionStatus.Connected ? "Connected" : "Disconnected";
 
-                if (_status.Value == "Disconnected")
+                if (device.ConnectionStatus != BluetoothConnectionStatus.Connected)
                 {
                     _batteryLevel.Value = 0;
-                    Console.WriteLine($"Bluetooth Plugin: Device '{_targetFriendlyName}' is disconnected.");
+                    Console.WriteLine("Bluetooth Plugin: Device '{0}' is disconnected", _targetFriendlyName);
+                    return;
                 }
-                else
-                {
-                    // Connect to the device and query battery level
-                    var bluetoothLeDevice = await BluetoothLEDevice.FromIdAsync(targetDevice.Id);
-                    if (bluetoothLeDevice == null)
-                    {
-                        _status.Value = "Failed to connect";
-                        _batteryLevel.Value = 0;
-                        Console.WriteLine($"Bluetooth Plugin: Failed to connect to '{_targetFriendlyName}'.");
-                        return;
-                    }
 
-                    // Get GATT services and find Battery Service (UUID 0x180F)
-                    var gattServices = await bluetoothLeDevice.GetGattServicesForUuidAsync(
-                        new Guid("0000180F-0000-1000-8000-00805F9B34FB") // Battery Service UUID
+                // Query the Battery Service (UUID 0x180F)
+                var gattServices = await device.GetGattServicesForUuidAsync(
+                    new Guid("0000180F-0000-1000-8000-00805F9B34FB"),
+                    cancellationToken
+                );
+
+                if (gattServices.Status == GattCommunicationStatus.Success && gattServices.Services.Count > 0)
+                {
+                    var batteryService = gattServices.Services[0];
+                    // Query the Battery Level characteristic (UUID 0x2A19)
+                    var characteristics = await batteryService.GetCharacteristicsForUuidAsync(
+                        new Guid("00002A19-0000-1000-8000-00805F9B34FB"),
+                        cancellationToken
                     );
 
-                    if (gattServices.Status == GattCommunicationStatus.Success && gattServices.Services.Count > 0)
+                    if (characteristics.Status == GattCommunicationStatus.Success && characteristics.Characteristics.Count > 0)
                     {
-                        var batteryService = gattServices.Services[0];
-                        var characteristics = await batteryService.GetCharacteristicsForUuidAsync(
-                            new Guid("00002A19-0000-1000-8000-00805F9B34FB") // Battery Level UUID
-                        );
-
-                        if (characteristics.Status == GattCommunicationStatus.Success && characteristics.Characteristics.Count > 0)
+                        var characteristic = characteristics.Characteristics[0];
+                        var result = await characteristic.ReadValueAsync(cancellationToken);
+                        if (result.Status == GattCommunicationStatus.Success)
                         {
-                            var characteristic = characteristics.Characteristics[0];
-                            var result = await characteristic.ReadValueAsync();
-                            if (result.Status == GattCommunicationStatus.Success)
-                            {
-                                var reader = Windows.Storage.Streams.DataReader.FromBuffer(result.Value);
-                                byte batteryLevel = reader.ReadByte();
-                                _batteryLevel.Value = batteryLevel;
-                                Console.WriteLine($"Bluetooth Plugin: Battery level for '{_targetFriendlyName}': {batteryLevel}%");
-                            }
-                            else
-                            {
-                                _batteryLevel.Value = 0;
-                                Console.WriteLine($"Bluetooth Plugin: Failed to read battery level: {result.Status}");
-                            }
+                            var reader = Windows.Storage.Streams.DataReader.FromBuffer(result.Value);
+                            byte batteryLevel = reader.ReadByte();
+                            _batteryLevel.Value = batteryLevel;
+                            Console.WriteLine("Bluetooth Plugin: Battery level for '{0}': {1}%", _targetFriendlyName, batteryLevel);
                         }
                         else
                         {
                             _batteryLevel.Value = 0;
-                            Console.WriteLine("Bluetooth Plugin: Battery Level characteristic not found.");
+                            Console.WriteLine("Bluetooth Plugin: Failed to read battery level: {0}", result.Status);
                         }
                     }
                     else
                     {
                         _batteryLevel.Value = 0;
-                        Console.WriteLine("Bluetooth Plugin: Battery Service not found or inaccessible.");
+                        Console.WriteLine("Bluetooth Plugin: Battery Level characteristic not found");
                     }
-
-                    // Clean up
-                    bluetoothLeDevice.Dispose();
+                }
+                else
+                {
+                    _batteryLevel.Value = 0;
+                    Console.WriteLine("Bluetooth Plugin: Battery Service not found or inaccessible");
                 }
             }
             catch (Exception ex)
             {
                 _status.Value = "Error";
                 _batteryLevel.Value = 0;
-                Console.WriteLine($"Bluetooth Plugin: Error updating - {ex.Message}");
+                Console.WriteLine("Bluetooth Plugin: Error updating device '{0}': {1}", _targetFriendlyName, ex.ToString());
             }
-
-            _lastUpdateTime = now;
+            finally
+            {
+                device?.Dispose(); // Clean up the device object to free resources
+            }
         }
 
-        // Close: Cleanup (empty for now)
-        public override void Close()
+        // Resets all sensor values to their defaults
+        private void ResetSensors()
         {
+            _deviceName.Value = "-";
+            _status.Value = "Disconnected";
+            _batteryLevel.Value = 0;
         }
 
-        // Optional: Synchronous update not implemented
-        public override void Update()
+        // Cleans up resources when the plugin is closed
+        public override void Close() => Dispose();
+
+        // Implements IDisposable to ensure proper cleanup
+        public void Dispose()
         {
-            throw new NotImplementedException();
+            ResetSensors();
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _currentDeviceId = null;
+            _isMonitoring = false;
+            Console.WriteLine("Bluetooth Plugin: Disposed; sensors reset, monitoring stopped");
+            GC.SuppressFinalize(this);
         }
+
+        // Finalizer ensures cleanup if Dispose isn’t called
+        ~BluetoothBatteryPlugin()
+        {
+            Dispose();
+        }
+
+        // Synchronous update not implemented; use UpdateAsync instead
+        public override void Update() => throw new NotImplementedException();
     }
 }

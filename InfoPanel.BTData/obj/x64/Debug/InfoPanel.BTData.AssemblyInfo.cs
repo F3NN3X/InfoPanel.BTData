@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InfoPanel.BTData")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ac1f3a12bb727a8154c1133560cb4372be56d7c0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fa32d89851c635c5d31f8d2d9ff70e5babbe8e4d")]
 [assembly: System.Reflection.AssemblyProductAttribute("InfoPanel.BTData")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InfoPanel.BTData")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
