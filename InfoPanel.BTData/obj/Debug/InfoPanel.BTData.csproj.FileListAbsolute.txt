@@ -1,0 +1,16 @@
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.csproj.AssemblyReference.cache
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\PluginInfo.ini
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\InfoPanel.BTData.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\InfoPanel.BTData.pdb
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\INIFileParser.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\Microsoft.Windows.SDK.NET.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\bin\Debug\WinRT.Runtime.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.GeneratedMSBuildEditorConfig.editorconfig
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.AssemblyInfoInputs.cache
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.AssemblyInfo.cs
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.csproj.CoreCompileInputs.cache
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPane.60A888E7.Up2Date
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\refint\InfoPanel.BTData.dll
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.pdb
+D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\ref\InfoPanel.BTData.dll
