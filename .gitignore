@@ -3,6 +3,19 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Ignore all hidden folders 
+./**/.*
+
+# Ignore bin and obj folders, recursively
+**/bin/
+**/obj/
+
+# Ignore .vs folder (Visual Studio)
+.vs/
+
+# Ignore .idea folder (IntelliJ IDEA)
+.idea/
+
 # User-specific files
 *.rsuser
 *.suo
