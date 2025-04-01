@@ -1,11 +1,11 @@
 --target
-D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.dll
+E:\GitHub\MyRepos\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\InfoPanel.BTData.dll
 --outdir
-D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDOptimizer\
+E:\GitHub\MyRepos\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDOptimizer\
 --refs 
- D:\gitProjects\infopanel\InfoPanel.Plugins\obj\Debug\net8.0-windows\ref\InfoPanel.Plugins.dll
+ E:\GitHub\PublicRepos\infopanel\InfoPanel.Plugins\obj\Debug\net8.0-windows\ref\InfoPanel.Plugins.dll
 --refs 
- C:\Users\joran\.nuget\packages\ini-parser-netstandard\2.5.2\lib\netstandard2.0\INIFileParser.dll
+ C:\Users\joransrb\.nuget\packages\ini-parser-netstandard\2.5.2\lib\netstandard2.0\INIFileParser.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\Microsoft.CSharp.dll
 --refs 
@@ -17,7 +17,7 @@ D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDO
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\Microsoft.Win32.Registry.dll
 --refs 
- C:\Users\joran\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.22621.57\lib\net8.0\Microsoft.Windows.SDK.NET.dll
+ C:\Users\joransrb\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.22621.57\lib\net8.0\Microsoft.Windows.SDK.NET.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\mscorlib.dll
 --refs 
@@ -26,6 +26,8 @@ D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDO
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.AppContext.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.Buffers.dll
+--refs 
+ C:\Users\joransrb\.nuget\packages\system.codedom\8.0.0\lib\net8.0\System.CodeDom.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.Collections.Concurrent.dll
 --refs 
@@ -136,6 +138,8 @@ D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDO
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.Linq.Parallel.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.Linq.Queryable.dll
+--refs 
+ C:\Users\joransrb\.nuget\packages\system.management\8.0.0\lib\net8.0\System.Management.dll
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\System.Memory.dll
 --refs 
@@ -335,4 +339,4 @@ D:\gitProjects\InfoPanelPlugins\InfoPanel.BTData\InfoPanel.BTData\obj\Debug\IIDO
 --refs 
  C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.14\ref\net8.0\WindowsBase.dll
 --refs 
- C:\Users\joran\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.22621.57\lib\net8.0\WinRT.Runtime.dll
+ C:\Users\joransrb\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.22621.57\lib\net8.0\WinRT.Runtime.dll
