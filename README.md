@@ -1,6 +1,6 @@
 # Bluetooth Device Battery Plugin for InfoPanel
 
-**Version**: 1.0.0  
+**Version**: 1.2.1  
 **Author**: F3NN3X / Themely.dev  
 
 ## Overview
