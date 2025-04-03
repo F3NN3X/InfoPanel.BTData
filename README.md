@@ -21,7 +21,7 @@ The **Bluetooth Device Battery Plugin** is an optimized plugin for [InfoPanel](h
 
 1. **Download the Release**:
    - Go to the [Releases](https://github.com/F3NN3X/InfoPanel.BTData/releases) page.
-   - Download the latest ZIP file for version `1.0.0` (e.g., `InfoPanel.BTData-v1.0.0.zip`).
+   - Download the latest ZIP file.
 
 2. **Import into InfoPanel**:
    - Open InfoPanel.
