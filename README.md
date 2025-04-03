@@ -35,9 +35,9 @@ The **Bluetooth Device Battery Plugin** is an optimized plugin for [InfoPanel](h
 
 ## Configuration
 
-The plugin generates a `InfoPanel.BTData.dll.ini` file in its directory upon first load. You can customize the refresh interval:
+The plugin generates a `bluetooth-battery-plugin.ini` file in its directory upon first load. You can customize the refresh interval:
 
-### `InfoPanel.BTData.dll.ini`
+### `bluetooth-battery-plugin.ini`
 ```ini
 [Bluetooth Battery Plugin]
 RefreshIntervalMinutes=5
