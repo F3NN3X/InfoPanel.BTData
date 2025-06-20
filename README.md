@@ -1,6 +1,8 @@
 # Bluetooth Device Battery Plugin for InfoPanel
 
-**Version**: 1.2.7 
+**CURRENTLY DONT WORK CORRECTLY!! WILL PROBABLY CRASH INFOPANEL**
+
+**Version**: 1.2.7 - BETA
 **Author**: F3NN3X / Themely.dev  
 
 ## Overview
