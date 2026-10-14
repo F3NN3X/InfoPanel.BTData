@@ -20,8 +20,6 @@
 
   <ItemGroup>
     <PackageReference Include="ini-parser-netstandard" Version="2.5.2" />
-    <!-- Add C#/WinRT packages -->
-    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
