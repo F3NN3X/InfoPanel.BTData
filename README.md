@@ -56,6 +56,13 @@ Reload the plugin in InfoPanel (e.g., by restarting InfoPanel or re-reload on th
 **InfoPanel:** Latest version with plugin support.
 **Bluetooth:** Enabled with paired Bluetooth LE devices. Devices must support the Battery Service (UUID 0x180F) for battery level reporting.
 
+## Releasing
+
+1. Bump `<Version>` in `InfoPanel.BTData/InfoPanel.BTData.csproj` and `Version` in `PluginInfo.ini`, and add a `CHANGELOG.md` entry for the new version.
+2. Commit, then push a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+The `Release Build` workflow builds the plugin, checks the tag matches the csproj version, and publishes the zip as a GitHub release. The plugin API comes from the committed `Libs/InfoPanel.Plugins.dll`, so no local InfoPanel checkout is needed.
+
 ### Building from Source
 Clone the repository:
 ```bash
